@@ -61,24 +61,24 @@ export const puzzleAPI = {
   createPuzzle: (puzzleData) => api.post('/puzzles', puzzleData),
   updatePuzzle: (id, puzzleData) => api.put(`/puzzles/${id}`, puzzleData),
   deletePuzzle: (id) => api.delete(`/puzzles/${id}`),
-  getRandomPuzzle: (level, difficulty) => api.get(`/puzzles/random?level=${level}&difficulty=${difficulty}`),
+  getRandomPuzzle: (level) => api.get(`/puzzles/random?level=${level}`),
   verifyAnswer: (puzzleId, answer) => api.post(`/puzzles/${puzzleId}/verify`, { answer }),
 };
 
 // Game API
 export const gameAPI = {
   startGame: () => api.post('/game/start'),
-  endGame: () => api.post('/game/end'),
   getCurrentGame: () => api.get('/game/current'),
-  submitAnswer: (puzzleId, answer, timeTaken) => 
-    api.post('/game/submit-answer', { puzzleId, answer, timeTaken }),
+  submitAnswer: (data) => api.post('/game/submit-answer', data),
+  completeTreasure: (data) => api.post('/game/complete-treasure', data),
+  endGame: () => api.post('/game/end'),
   getLeaderboard: () => api.get('/game/leaderboard'),
-  getAvailableDifficulties: () => api.get('/game/available-difficulties'),
 };
 
 // Treasure API
 export const treasureAPI = {
   getAllTreasures: () => api.get('/treasure'),
+  getTreasures: () => api.get('/treasure'),
   getTreasureByCode: (code) => api.get(`/treasure/${code}`),
   verifyTreasureCode: (code) => api.post('/treasure/verify', { code }),
   createTreasure: (treasureData) => api.post('/treasure', treasureData),

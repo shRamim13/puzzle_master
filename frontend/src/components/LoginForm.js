@@ -99,8 +99,8 @@ const LoginForm = () => {
           maxWidth: '500px'
         }}>
           <div style={{
-            width: '300px',
-            height: '300px',
+            width: '400px',
+            height: '600px',
             margin: '0 auto 30px',
             display: 'flex',
             alignItems: 'center',

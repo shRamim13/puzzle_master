@@ -13,11 +13,6 @@ const treasureSchema = new mongoose.Schema({
     min: 1,
     max: 5
   },
-  difficulty: {
-    type: String,
-    enum: ['easy', 'medium', 'hard'],
-    required: true
-  },
   clue: {
     type: String,
     required: true,

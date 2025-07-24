@@ -14,14 +14,8 @@ const gameSessionSchema = new mongoose.Schema({
     type: Number,
     default: 1
   },
-  currentDifficulty: {
-    type: String,
-    enum: ['easy', 'medium', 'hard'],
-    default: 'easy'
-  },
   completedLevels: [{
     level: Number,
-    difficulty: String,
     puzzleId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'Puzzle'
@@ -58,6 +52,5 @@ const gameSessionSchema = new mongoose.Schema({
 });
 
 gameSessionSchema.index({ teamId: 1, status: 1 });
-gameSessionSchema.index({ totalPoints: -1, totalTime: 1 });
 
 module.exports = mongoose.model('GameSession', gameSessionSchema); 

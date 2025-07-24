@@ -6,11 +6,6 @@ const puzzleSchema = new mongoose.Schema({
     required: true,
     min: 1
   },
-  difficulty: {
-    type: String,
-    enum: ['easy', 'medium', 'hard'],
-    required: true
-  },
   question: {
     type: String,
     required: true,
@@ -47,6 +42,6 @@ const puzzleSchema = new mongoose.Schema({
   timestamps: true
 });
 
-puzzleSchema.index({ level: 1, difficulty: 1 });
+puzzleSchema.index({ level: 1 });
 
 module.exports = mongoose.model('Puzzle', puzzleSchema); 

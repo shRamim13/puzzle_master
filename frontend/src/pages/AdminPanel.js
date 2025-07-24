@@ -13,7 +13,8 @@ import {
   Row,
   Col,
   Tabs,
-  Switch
+  Switch,
+  Tag
 } from 'antd';
 import { 
   PlusOutlined, 
@@ -21,7 +22,8 @@ import {
   DeleteOutlined,
   QrcodeOutlined,
   PuzzleOutlined,
-  TrophyOutlined
+  TrophyOutlined,
+  ExclamationCircleOutlined
 } from '@ant-design/icons';
 import { puzzleAPI, treasureAPI } from '../services/api';
 import { useAuth } from '../context/AuthContext';
@@ -67,6 +69,7 @@ const AdminPanel = () => {
 
   const handlePuzzleSubmit = async (values) => {
     try {
+      console.log('Puzzle form values:', values); // Debug log
       if (editingPuzzle) {
         await puzzleAPI.updatePuzzle(editingPuzzle._id, values);
         message.success('Puzzle updated successfully');
@@ -111,10 +114,31 @@ const AdminPanel = () => {
     }
   };
 
-  const handleEditPuzzle = (puzzle) => {
-    setEditingPuzzle(puzzle);
-    puzzleForm.setFieldsValue(puzzle);
-    setPuzzleModalVisible(true);
+  const handleEditPuzzle = async (puzzle) => {
+    try {
+      // Get treasure data for this puzzle's level
+      const treasureResponse = await treasureAPI.getTreasures();
+      const treasure = treasureResponse.find(t => t.level === puzzle.level);
+      
+      setEditingPuzzle(puzzle);
+      puzzleForm.setFieldsValue({
+        ...puzzle,
+        hints: puzzle.hints ? puzzle.hints.join('\n') : '',
+        treasureClue: treasure?.clue || '',
+        treasureLocation: treasure?.location || '',
+        nextDestination: treasure?.nextDestination || ''
+      });
+      setPuzzleModalVisible(true);
+    } catch (error) {
+      console.error('Error loading treasure data:', error);
+      // Fallback to just puzzle data
+      setEditingPuzzle(puzzle);
+      puzzleForm.setFieldsValue({
+        ...puzzle,
+        hints: puzzle.hints ? puzzle.hints.join('\n') : ''
+      });
+      setPuzzleModalVisible(true);
+    }
   };
 
   const handleEditTreasure = (treasure) => {
@@ -151,21 +175,6 @@ const AdminPanel = () => {
       width: 80,
     },
     {
-      title: 'Difficulty',
-      dataIndex: 'difficulty',
-      key: 'difficulty',
-      width: 100,
-      render: (difficulty) => (
-        <span style={{ 
-          color: difficulty === 'easy' ? '#52c41a' : 
-                 difficulty === 'medium' ? '#faad14' : '#f5222d',
-          fontWeight: 'bold'
-        }}>
-          {difficulty.toUpperCase()}
-        </span>
-      )
-    },
-    {
       title: 'Type',
       dataIndex: 'questionType',
       key: 'questionType',
@@ -189,6 +198,23 @@ const AdminPanel = () => {
       dataIndex: 'points',
       key: 'points',
       width: 80,
+    },
+    {
+      title: 'Treasure',
+      key: 'treasure',
+      width: 100,
+      render: (_, record) => {
+        const treasure = treasures.find(t => t.level === record.level);
+        return treasure ? (
+          <Tag color="green" icon={<TrophyOutlined />}>
+            Set
+          </Tag>
+        ) : (
+          <Tag color="orange" icon={<ExclamationCircleOutlined />}>
+            Not Set
+          </Tag>
+        );
+      },
     },
     {
       title: 'Actions',
@@ -227,21 +253,6 @@ const AdminPanel = () => {
       dataIndex: 'level',
       key: 'level',
       width: 80,
-    },
-    {
-      title: 'Difficulty',
-      dataIndex: 'difficulty',
-      key: 'difficulty',
-      width: 100,
-      render: (difficulty) => (
-        <span style={{ 
-          color: difficulty === 'easy' ? '#52c41a' : 
-                 difficulty === 'medium' ? '#faad14' : '#f5222d',
-          fontWeight: 'bold'
-        }}>
-          {difficulty.toUpperCase()}
-        </span>
-      )
     },
     {
       title: 'Clue',
@@ -419,7 +430,7 @@ const AdminPanel = () => {
           puzzleForm.resetFields();
         }}
         footer={null}
-        width={600}
+        width={700}
       >
         <Form
           form={puzzleForm}
@@ -427,7 +438,7 @@ const AdminPanel = () => {
           onFinish={handlePuzzleSubmit}
         >
           <Row gutter={16}>
-            <Col span={8}>
+            <Col span={12}>
               <Form.Item
                 name="level"
                 label="Level"
@@ -440,31 +451,18 @@ const AdminPanel = () => {
                 </Select>
               </Form.Item>
             </Col>
-            <Col span={8}>
-              <Form.Item
-                name="difficulty"
-                label="Difficulty"
-                rules={[{ required: true, message: 'Please select difficulty' }]}
-              >
-                <Select placeholder="Select difficulty">
-                  <Option value="easy">Easy</Option>
-                  <Option value="medium">Medium</Option>
-                  <Option value="hard">Hard</Option>
-                </Select>
-              </Form.Item>
-            </Col>
-            <Col span={8}>
+            <Col span={12}>
               <Form.Item
                 name="questionType"
-                label="Type"
-                rules={[{ required: true, message: 'Please select type' }]}
+                label="Question Type"
+                rules={[{ required: true, message: 'Please select question type' }]}
               >
-                <Select placeholder="Select type">
+                <Select placeholder="Select question type">
                   <Option value="riddle">Riddle</Option>
+                  <Option value="question">Question</Option>
                   <Option value="math">Math</Option>
                   <Option value="science">Science</Option>
                   <Option value="internet">Internet</Option>
-                  <Option value="question">Question</Option>
                 </Select>
               </Form.Item>
             </Col>
@@ -501,6 +499,51 @@ const AdminPanel = () => {
             <Input type="number" placeholder="Enter points" />
           </Form.Item>
 
+          {/* Checkpoint Clue Section */}
+          <div style={{ 
+            border: '2px solid #1890ff', 
+            borderRadius: '8px', 
+            padding: '20px', 
+            marginBottom: '20px',
+            background: '#f0f8ff'
+          }}>
+            <Title level={4} style={{ marginBottom: '16px', color: '#1890ff' }}>
+              🎯 Checkpoint Clue (Optional)
+            </Title>
+            <Text type="secondary" style={{ display: 'block', marginBottom: '20px' }}>
+              This clue will be shown to players after they solve this puzzle
+            </Text>
+            
+            <Form.Item
+              name="treasureClue"
+              label="Treasure Clue"
+            >
+              <TextArea 
+                rows={3} 
+                placeholder="Enter the clue that leads to the next treasure point (e.g., 'Look for the ancient tree near the fountain')" 
+              />
+            </Form.Item>
+
+            <Row gutter={16}>
+              <Col span={12}>
+                <Form.Item
+                  name="treasureLocation"
+                  label="Treasure Location"
+                >
+                  <Input placeholder="Physical location (e.g., 'Central Park Fountain')" />
+                </Form.Item>
+              </Col>
+              <Col span={12}>
+                <Form.Item
+                  name="nextDestination"
+                  label="Next Destination"
+                >
+                  <Input placeholder="Next location hint (e.g., 'Library Entrance')" />
+                </Form.Item>
+              </Col>
+            </Row>
+          </div>
+
           <Form.Item>
             <Space>
               <Button type="primary" htmlType="submit">
@@ -536,7 +579,7 @@ const AdminPanel = () => {
           onFinish={handleTreasureSubmit}
         >
           <Row gutter={16}>
-            <Col span={8}>
+            <Col span={12}>
               <Form.Item
                 name="code"
                 label="Code"
@@ -545,7 +588,7 @@ const AdminPanel = () => {
                 <Input placeholder="Enter unique code" />
               </Form.Item>
             </Col>
-            <Col span={8}>
+            <Col span={12}>
               <Form.Item
                 name="level"
                 label="Level"
@@ -555,19 +598,6 @@ const AdminPanel = () => {
                   {[1, 2, 3, 4, 5].map(level => (
                     <Option key={level} value={level}>{level}</Option>
                   ))}
-                </Select>
-              </Form.Item>
-            </Col>
-            <Col span={8}>
-              <Form.Item
-                name="difficulty"
-                label="Difficulty"
-                rules={[{ required: true, message: 'Please select difficulty' }]}
-              >
-                <Select placeholder="Select difficulty">
-                  <Option value="easy">Easy</Option>
-                  <Option value="medium">Medium</Option>
-                  <Option value="hard">Hard</Option>
                 </Select>
               </Form.Item>
             </Col>

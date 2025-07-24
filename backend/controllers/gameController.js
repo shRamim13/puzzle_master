@@ -1,42 +1,30 @@
 const GameSession = require('../models/GameSession');
 const Puzzle = require('../models/Puzzle');
 const Treasure = require('../models/Treasure');
-const { calculatePoints, calculateTotalScore } = require('../utils/scoring');
+const { calculatePoints } = require('../utils/scoring');
 const { GAME_CONFIG } = require('../config/constants');
 
-// Start a new game session
+// Start new game session
 const startGame = async (req, res) => {
   try {
-    // Check if user already has an active game
-    const existingGame = await GameSession.findOne({
+    // Check if user already has an active session
+    const existingSession = await GameSession.findOne({
       teamId: req.user.id,
       status: 'active'
     });
 
-    if (existingGame) {
-      return res.status(400).json({ 
-        message: 'You already have an active game session' 
-      });
+    if (existingSession) {
+      return res.status(400).json({ message: 'You already have an active game session' });
     }
 
     const gameSession = new GameSession({
       teamId: req.user.id,
       teamName: req.user.teamName,
-      currentLevel: 1,
-      currentDifficulty: null,
-      status: 'active',
-      startTime: new Date(),
-      totalPoints: 0,
-      totalTime: 0,
-      completedLevels: []
+      currentLevel: 1
     });
 
     await gameSession.save();
-
-    res.status(201).json({
-      message: 'Game started successfully',
-      gameSession
-    });
+    res.status(201).json(gameSession);
   } catch (error) {
     res.status(500).json({ message: 'Server error' });
   }
@@ -82,30 +70,30 @@ const submitAnswer = async (req, res) => {
     const isCorrect = puzzle.answer === answer.toLowerCase().trim();
 
     if (isCorrect) {
-      // Calculate points based on difficulty and time
-      const points = calculatePoints(puzzle.difficulty, timeTaken);
+      // Calculate points based on time
+      const points = calculatePoints(timeTaken);
       
       // Add completed level
       const completedLevel = {
         level: puzzle.level,
-        difficulty: puzzle.difficulty,
-        points,
+        puzzleId: puzzle._id,
+        startTime: new Date(Date.now() - timeTaken * 1000),
+        endTime: new Date(),
         timeTaken,
-        completedAt: new Date()
+        points
       };
 
       gameSession.completedLevels.push(completedLevel);
       gameSession.totalPoints += points;
       gameSession.totalTime += timeTaken;
 
-      // Get treasure hint for this level and difficulty
+      // Get treasure hint for this level
       let treasureHint = null;
       let treasureLocation = null;
       let nextDestination = null;
       
       const treasure = await Treasure.findOne({
         level: puzzle.level,
-        difficulty: puzzle.difficulty,
         isActive: true
       });
 
@@ -124,52 +112,69 @@ const submitAnswer = async (req, res) => {
       } else {
         // Move to next level
         gameSession.currentLevel = gameSession.completedLevels.length + 1;
-        gameSession.currentDifficulty = null;
       }
 
       await gameSession.save();
 
       res.json({
         isCorrect: true,
-        message: 'Correct answer!',
-        gameSession,
         points,
         treasureHint,
         treasureLocation,
-        nextDestination
+        nextDestination,
+        gameSession
       });
     } else {
-      res.json({
-        isCorrect: false,
-        message: 'Incorrect answer. Try again!'
-      });
+      res.json({ isCorrect: false, points: 0 });
     }
   } catch (error) {
     res.status(500).json({ message: 'Server error' });
   }
 };
 
-// End current game session
-const endGame = async (req, res) => {
+// Complete treasure point
+const completeTreasure = async (req, res) => {
   try {
-    const gameSession = await GameSession.findOneAndUpdate(
-      {
-        teamId: req.user.id,
-        status: 'active'
-      },
-      {
-        status: 'ended',
-        endTime: new Date()
-      },
-      { new: true }
-    );
+    const { treasureCode } = req.body;
+
+    const gameSession = await GameSession.findOne({
+      teamId: req.user.id,
+      status: 'active'
+    });
 
     if (!gameSession) {
       return res.status(404).json({ message: 'No active game session found' });
     }
 
+    const treasure = await Treasure.findOne({
+      code: treasureCode,
+      isActive: true
+    });
+
+    if (!treasure) {
+      return res.status(404).json({ message: 'Invalid treasure code' });
+    }
+
+    // Check if already completed by this team
+    const alreadyCompleted = treasure.completedBy.some(
+      completion => completion.teamId.toString() === req.user.id
+    );
+
+    if (alreadyCompleted) {
+      return res.status(400).json({ message: 'Treasure already completed by your team' });
+    }
+
+    // Add completion record
+    treasure.completedBy.push({
+      teamId: req.user.id,
+      completedAt: new Date()
+    });
+
+    await treasure.save();
+
     res.json({
-      message: 'Game ended successfully',
+      message: 'Treasure completed successfully',
+      treasure,
       gameSession
     });
   } catch (error) {
@@ -177,53 +182,8 @@ const endGame = async (req, res) => {
   }
 };
 
-// Get leaderboard
-const getLeaderboard = async (req, res) => {
-  try {
-    const leaderboard = await GameSession.aggregate([
-      {
-        $match: {
-          status: { $in: ['completed', 'ended'] }
-        }
-      },
-      {
-        $addFields: {
-          finalScore: {
-            $add: [
-              '$totalPoints',
-              { $multiply: ['$totalTime', -0.1] } // Time penalty
-            ]
-          }
-        }
-      },
-      {
-        $sort: {
-          isCompleted: -1, // Completed games first
-          finalScore: -1,  // Then by score
-          totalTime: 1     // Then by time
-        }
-      },
-      {
-        $project: {
-          teamName: 1,
-          totalPoints: 1,
-          totalTime: 1,
-          completedLevels: 1,
-          isCompleted: 1,
-          status: 1,
-          finalScore: 1
-        }
-      }
-    ]);
-
-    res.json(leaderboard);
-  } catch (error) {
-    res.status(500).json({ message: 'Server error' });
-  }
-};
-
-// Get available difficulties for current level
-const getAvailableDifficulties = async (req, res) => {
+// End game session
+const endGame = async (req, res) => {
   try {
     const gameSession = await GameSession.findOne({
       teamId: req.user.id,
@@ -234,10 +194,25 @@ const getAvailableDifficulties = async (req, res) => {
       return res.status(404).json({ message: 'No active game session found' });
     }
 
-    // Allow all difficulties for all levels
-    const availableDifficulties = ['easy', 'medium', 'hard'];
+    gameSession.status = 'completed';
+    gameSession.endTime = new Date();
+    await gameSession.save();
 
-    res.json({ availableDifficulties });
+    res.json({ message: 'Game ended successfully', gameSession });
+  } catch (error) {
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
+// Get leaderboard
+const getLeaderboard = async (req, res) => {
+  try {
+    const leaderboard = await GameSession.find({ status: 'completed' })
+      .populate('teamId', 'teamName')
+      .sort({ totalPoints: -1, totalTime: 1 })
+      .limit(10);
+
+    res.json(leaderboard);
   } catch (error) {
     res.status(500).json({ message: 'Server error' });
   }
@@ -247,7 +222,7 @@ module.exports = {
   startGame,
   getCurrentGame,
   submitAnswer,
+  completeTreasure,
   endGame,
-  getLeaderboard,
-  getAvailableDifficulties
+  getLeaderboard
 }; 

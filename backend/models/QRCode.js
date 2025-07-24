@@ -10,11 +10,6 @@ const qrCodeSchema = new mongoose.Schema({
     type: Number,
     required: true
   },
-  difficulty: {
-    type: String,
-    enum: ['easy', 'medium', 'hard'],
-    required: true
-  },
   puzzleId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Puzzle',
@@ -48,6 +43,6 @@ const qrCodeSchema = new mongoose.Schema({
 });
 
 qrCodeSchema.index({ code: 1 });
-qrCodeSchema.index({ level: 1, difficulty: 1 });
+qrCodeSchema.index({ level: 1 });
 
 module.exports = mongoose.model('QRCode', qrCodeSchema); 

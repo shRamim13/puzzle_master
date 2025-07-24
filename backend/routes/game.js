@@ -4,9 +4,9 @@ const {
   startGame, 
   getCurrentGame, 
   submitAnswer, 
+  completeTreasure,
   endGame, 
-  getLeaderboard, 
-  getAvailableDifficulties 
+  getLeaderboard
 } = require('../controllers/gameController');
 const { captainAuth, auth } = require('../middleware/auth');
 
@@ -14,8 +14,8 @@ const { captainAuth, auth } = require('../middleware/auth');
 router.post('/start', captainAuth, startGame);
 router.get('/current', captainAuth, getCurrentGame);
 router.post('/submit-answer', captainAuth, submitAnswer);
+router.post('/complete-treasure', captainAuth, completeTreasure);
 router.post('/end', captainAuth, endGame);
-router.get('/available-difficulties', captainAuth, getAvailableDifficulties);
 
 // Public routes
 router.get('/leaderboard', auth, getLeaderboard);
